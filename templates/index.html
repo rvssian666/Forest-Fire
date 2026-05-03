@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Simulador de Incendios Forestales</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg: #ffffff;
+            --primary: #e63946;
+            --secondary: #457b9d;
+            --accent: #f1faee;
+            --text: #1d3557;
+            --empty: #2c3e50;
+            --tree: #27ae60;
+            --fire: #e74c3c;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Panel Lateral */
+        #sidebar {
+            width: 350px;
+            background: var(--panel-bg);
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        h1 { font-size: 1.5rem; margin-bottom: 20px; color: var(--primary); text-align: center; }
+        h3 { font-size: 1rem; margin: 15px 0 10px; border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+
+        .control-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.9rem; margin-bottom: 5px; font-weight: bold; }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--secondary); color: var(--secondary); }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Área Principal */
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        #canvas-container {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 100%;
+            max-height: 80vh;
+        }
+
+        canvas { display: block; image-rendering: pixelated; }
+
+        #stats-bar {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            background: var(--panel-bg);
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .stat-item { font-size: 0.9rem; font-weight: bold; }
+        .stat-val { color: var(--primary); }
+
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 4px;
+            color: white;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+    <aside id="sidebar">
+        <h1>🔥 Forest Fire API</h1>
+        
+        <h3>1. Configurar Clima</h3>
+        <div class="control-group">
+            <label>Ciudad</label>
+            <input type="text" id="cityInput" placeholder="Ej: Madrid, Bilbao...">
+            <button class="btn-outline" onclick="fetchWeather()">Consultar Clima</button>
+        </div>
+
+        <h3>2. Nueva Simulación</h3>
+        <div class="control-group">
+            <label>Tamaño (20-200)</label>
+            <input type="number" id="sizeInput" value="100" min="20" max="200">
+        </div>
+        <div class="control-group">
+            <label>Prob. Crecimiento (p)</label>
+            <input type="number" id="pInput" value="0.05" step="0.01">
+        </div>
+        <div class="control-group">
+            <label>Prob. Rayo (f)</label>
+            <input type="number" id="fInput" value="0.001" step="0.0001">
+        </div>
+        <button class="btn-primary" onclick="createSimulation()">CREAR SIMULACIÓN</button>
+
+        <h3>3. Control</h3>
+        <button class="btn-secondary" id="stepBtn" onclick="nextStep()" disabled>Siguiente Paso</button>
+        <button class="btn-outline" id="autoBtn" onclick="toggleAuto()" disabled>Modo Automático: OFF</button>
+        
+        <div id="weatherInfo" style="margin-top: 20px; font-size: 0.85rem; color: #666;"></div>
+    </aside>
+
+    <main id="main-content">
+        <div id="canvas-container">
+            <canvas id="fireCanvas"></canvas>
+        </div>
+
+        <div id="stats-bar">
+            <div class="stat-item">ID: <span id="statId" class="stat-val">-</span></div>
+            <div class="stat-item">Pasos: <span id="statSteps" class="stat-val">0</span></div>
+            <div class="stat-item">Estado: <span id="statStatus" class="stat-val">Esperando...</span></div>
+        </div>
+    </main>
+
+    <div id="toast"></div>
+
+    <script>
+        let currentId = null;
+        let autoInterval = null;
+        const canvas = document.getElementById('fireCanvas');
+        const ctx = canvas.getContext('2d');
+        const COLORS = ['#2c3e50', '#27ae60', '#e74c3c']; // Vacío, Árbol, Fuego
+
+        function showToast(msg, type='info') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.background = type === 'error' ? '#e63946' : '#2a9d8f';
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        async function fetchWeather() {
+            const city = document.getElementById('cityInput').value;
+            if (!city) return showToast("Introduce una ciudad", "error");
+            
+            try {
+                const res = await fetch(`/api/weather/?city=${city}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                document.getElementById('pInput').value = data.p;
+                document.getElementById('fInput').value = data.f;
+                document.getElementById('weatherInfo').innerHTML = 
+                    `🌤️ <b>${data.city}</b>: ${data.temp}°C, ${data.humidity}% humedad.<br>Parámetros sugeridos aplicados.`;
+                showToast("Datos de clima actualizados");
+            } catch (e) {
+                showToast(e.message, "error");
+            }
+        }
+
+        async function createSimulation() {
+            const body = {
+                size: parseInt(document.getElementById('sizeInput').value),
+                p: parseFloat(document.getElementById('pInput').value),
+                f: parseFloat(document.getElementById('fInput').value)
+            };
+
+            try {
+                const res = await fetch('/api/simulations/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(JSON.stringify(data));
+
+                currentId = data.id;
+                updateUI(data);
+                showToast("Simulación creada correctamente");
+                
+                document.getElementById('stepBtn').disabled = false;
+                document.getElementById('autoBtn').disabled = false;
+            } catch (e) {
+                showToast("Error al crear: " + e.message, "error");
+            }
+        }
+
+        async function nextStep() {
+            if (!currentId) return;
+            try {
+                const res = await fetch(`/api/simulations/${currentId}/step/`, { method: 'POST' });
+                const data = await res.json();
+                updateUI(data);
+            } catch (e) {
+                stopAuto();
+                showToast("Error en el paso", "error");
+            }
+        }
+
+        function updateUI(data) {
+            document.getElementById('statId').textContent = data.id.substring(0,8);
+            document.getElementById('statSteps').textContent = data.steps_count;
+            document.getElementById('statStatus').textContent = "Activa";
+            drawGrid(data.grid_data);
+        }
+
+        function drawGrid(grid) {
+            const size = grid.length;
+            const cellSize = Math.floor(600 / size);
+            canvas.width = size * cellSize;
+            canvas.height = size * cellSize;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    ctx.fillStyle = COLORS[grid[r][c]];
+                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function toggleAuto() {
+            if (autoInterval) {
+                stopAuto();
+            } else {
+                autoInterval = setInterval(nextStep, 100);
+                document.getElementById('autoBtn').textContent = "Modo Automático: ON";
+                document.getElementById('autoBtn').classList.replace('btn-outline', 'btn-primary');
+            }
+        }
+
+        function stopAuto() {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            document.getElementById('autoBtn').textContent = "Modo Automático: OFF";
+            document.getElementById('autoBtn').classList.replace('btn-primary', 'btn-outline');
+        }
+    </script>
+</body>
+</html>
