@@ -156,11 +156,11 @@
             <canvas id="fireCanvas"></canvas>
         </div>
 
-        <div id="stats-bar">
-            <div class="stat-item">ID: <span id="statId" class="stat-val">-</span></div>
-            <div class="stat-item">Pasos: <span id="statSteps" class="stat-val">0</span></div>
-            <div class="stat-item">Estado: <span id="statStatus" class="stat-val">Esperando...</span></div>
-        </div>
+    <div id="stats-bar">
+        <div class="stat-item">ID: <span id="statId" class="stat-val">-</span></div>
+        <div class="stat-item">Pasos: <span id="statSteps" class="stat-val">0</span></div>
+        <div class="stat-item">Densidad: <span id="statDensity" class="stat-val">0%</span></div> <div class="stat-item">Estado: <span id="statStatus" class="stat-val">Esperando...</span></div>
+    </div>
     </main>
 
     <div id="toast"></div>
@@ -180,24 +180,35 @@
             setTimeout(() => t.style.display = 'none', 3000);
         }
 
-        async function fetchWeather() {
-            const city = document.getElementById('cityInput').value;
-            if (!city) return showToast("Introduce una ciudad", "error");
-            
-            try {
-                const res = await fetch(`/api/weather/?city=${city}`);
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
+    async function fetchWeather() {
+        const city = document.getElementById('cityInput').value;
+        if (!city) return showToast("Introduce una ciudad", "error");
+    
+        try {
+            const res = await fetch(`/api/weather/?city=${city}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
 
-                document.getElementById('pInput').value = data.p;
-                document.getElementById('fInput').value = data.f;
-                document.getElementById('weatherInfo').innerHTML = 
-                    `🌤️ <b>${data.city}</b>: ${data.temp}°C, ${data.humidity}% humedad.<br>Parámetros sugeridos aplicados.`;
-                showToast("Datos de clima actualizados");
-            } catch (e) {
-                showToast(e.message, "error");
-            }
+            // Actualizamos los inputs de la simulación con los datos del servidor
+            document.getElementById('pInput').value = data.p;
+            document.getElementById('fInput').value = data.f;
+
+            // Insertamos la información detallada en el panel lateral
+            document.getElementById('weatherInfo').innerHTML = `
+                <div style="background: #e9f5ff; padding: 10px; border-radius: 5px; border-left: 4px solid #457b9d; margin-top: 10px;">
+                    <p>📍 <b>${data.city}</b></p>
+                    <p>🌡️ Temp: ${data.temp}°C</p>
+                    <p>💧 Humedad: ${data.humidity}%</p>
+                    <p>💨 Viento: ${data.wind_speed} km/h</p>
+                    <hr style="margin: 5px 0; border: 0; border-top: 1px solid #ccc;">
+                    <p><small><i>Parámetros ajustados según clima actual.</i></small></p>
+                </div>
+            `;
+            showToast("Clima de " + data.city + " cargado");
+        } catch (e) {
+            showToast("Error: " + e.message, "error");
         }
+    }
 
         async function createSimulation() {
             const body = {
@@ -238,12 +249,20 @@
             }
         }
 
-        function updateUI(data) {
-            document.getElementById('statId').textContent = data.id.substring(0,8);
-            document.getElementById('statSteps').textContent = data.steps_count;
-            document.getElementById('statStatus').textContent = "Activa";
-            drawGrid(data.grid_data);
-        }
+    function updateUI(data) {
+    document.getElementById('statId').textContent = data.id.substring(0,8);
+    document.getElementById('statSteps').textContent = data.steps_count;
+    
+    // Verificamos si tree_density existe antes de calcular
+    if (data.tree_density !== undefined && data.tree_density !== null) {
+        document.getElementById('statDensity').textContent = (data.tree_density * 100).toFixed(2) + "%";
+    } else {
+        document.getElementById('statDensity').textContent = "0.00%";
+    }
+    
+    document.getElementById('statStatus').textContent = "Activa";
+    drawGrid(data.grid_data);
+}
 
         function drawGrid(grid) {
             const size = grid.length;

@@ -10,22 +10,25 @@ from .engine import ForestFireEngine
 from .weather import get_weather_params
 
 class SimulationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar el ciclo de vida de las simulaciones de incendio.
+    Permite crear, listar, ver detalle, actualizar parámetros y eliminar simulaciones.
+    """
     queryset = Simulation.objects.all()
     serializer_class = SimulationSerializer
 
     def perform_create(self, serializer):
+        """Crea una nueva simulación inicializando la cuadrícula aleatoriamente."""
         engine = ForestFireEngine(serializer.validated_data['size'], serializer.validated_data['p'], serializer.validated_data['f'])
         serializer.save(grid_data=engine.grid.tolist())
 
     @action(detail=True, methods=['post'])
     def step(self, request, pk=None):
         """
-    Avanza la simulación N pasos.
-    Parámetros:
-        - steps (int, opcional): Número de pasos a avanzar. Por defecto 1.
-    Respuesta:
-        - JSON con el estado actualizado de la simulación.
-    """
+        Avanza la simulación N pasos.
+        Cuerpo (JSON) o Query Param: 'steps' (int, por defecto 1).
+        Retorna: Estado completo de la simulación tras los pasos ejecutados.
+        """
         sim = self.get_object()
         
         steps_val = request.data.get('steps') or request.query_params.get('steps', 1)
