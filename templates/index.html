@@ -161,6 +161,12 @@
         <div class="stat-item">Pasos: <span id="statSteps" class="stat-val">0</span></div>
         <div class="stat-item">Densidad: <span id="statDensity" class="stat-val">0%</span></div> <div class="stat-item">Estado: <span id="statStatus" class="stat-val">Esperando...</span></div>
     </div>
+    <div id="histogramSection" style="margin-top: 20pxpx; padding: 15px; background: #fff3e0; border-radius: 5px; border-left: 4px solid #ff9800;">
+    <h4 style="font-size: 0.8rem; margin-bottom: 5px;">📊 Histograma de Incendios</h4>
+    <div id="histList" style="font-size: 0.75rem; max-height: 100px; overflow-y: auto;">
+        Sin incendios registrados aún.
+    </div>
+    </div>
     </main>
 
     <div id="toast"></div>
@@ -252,15 +258,19 @@
     function updateUI(data) {
     document.getElementById('statId').textContent = data.id.substring(0,8);
     document.getElementById('statSteps').textContent = data.steps_count;
-    
-    // Verificamos si tree_density existe antes de calcular
-    if (data.tree_density !== undefined && data.tree_density !== null) {
-        document.getElementById('statDensity').textContent = (data.tree_density * 100).toFixed(2) + "%";
-    } else {
-        document.getElementById('statDensity').textContent = "0.00%";
-    }
-    
+    document.getElementById('statDensity').textContent = (data.tree_density * 100).toFixed(2) + "%";
     document.getElementById('statStatus').textContent = "Activa";
+
+    // Lógica para mostrar el histograma
+    const histDiv = document.getElementById('histList');
+    if (data.fire_histogram && Object.keys(data.fire_histogram).length > 0) {
+        let items = "";
+        for (const [size, count] of Object.entries(data.fire_histogram)) {
+            items += `<div>• Tamaño <b>${size}</b>: ${count} veces</div>`;
+        }
+        histDiv.innerHTML = items;
+    }
+
     drawGrid(data.grid_data);
 }
 
