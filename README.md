@@ -100,7 +100,7 @@ Este proyecto está bajo la licencia MIT. Consulta el archivo LICENSE para más 
 
 ## 👤 Autor
 
-**rvssian666** - [GitHub Profile](https://github.com/rvssian666)
+**Alexander Fuentes Valladares** - [GitHub Profile](https://github.com/rvssian666)
 
 ---
 
